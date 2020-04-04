@@ -1,0 +1,237 @@
+﻿// 20200690 박진철
+// 2020-04-04
+
+// 방탈 라이브러리 사용을 위한 전처리기
+#include <Bangtal.h>
+#pragma comment(lib, "Bangtal.lib")
+
+// sprintf_s 사용을 위한 전처리기
+#include <stdio.h>
+
+// 난수 생성을 위한 전처리기
+#include <time.h>
+#include <stdlib.h>
+
+// c-string
+#include <string.h>
+
+// ==============================================================================================================
+// 구조체
+
+// 퍼즐 조각
+typedef struct {
+	// 오브젝트 이름 및 이미지 파일
+	ObjectID id;
+	// 오브젝트의 X, Y좌표 위치
+	int x, y;
+	// 공백 칸인지 여부
+	bool isEmpty;
+} Object;
+
+// ==============================================================================================================
+// 전역 변수
+
+// 시작 화면, 퍼즐 화면
+SceneID startScene, mainScene;
+
+// 시작 버튼, 재시작 버튼
+Object startButton, restartButton;
+
+// 퍼즐 조각 (사과)
+Object APPLE;
+Object apples[9];
+
+// 퍼즐 조각들의 좌표
+int appleX[3] = { 400, 570, 740 };
+int appleY[3] = { 490, 320, 150 };
+
+// 2차원 배열로 퍼즐 구현
+Object puzzle[3][3];
+
+// 퍼즐의 답안
+Object answer[3][3];
+
+// ==============================================================================================================
+// 구조체 사용과 관련한 함수 오버로딩
+
+// locateObject 오버로딩 1
+void locateObject(Object& obj, SceneID scene) {
+	locateObject(obj.id, scene, obj.x, obj.y);
+}
+
+// locateObject 오버로딩 2
+void locateObject(Object& obj, SceneID scene, int x, int y) {
+	obj.x = x;
+	obj.y = y;
+	locateObject(obj, scene);
+}
+
+// showObject 오버로딩
+void showObject(Object& obj) {
+	showObject(obj.id);
+}
+
+// hideObject 오버로딩
+void hideObject(Object& obj) {
+	hideObject(obj.id);
+}
+
+// scaleObject 오버로딩
+void scaleObject(Object& obj, float scale) {
+	scaleObject(obj.id, scale);
+}
+
+// setObjectImage 오버로딩
+void setObjectImage(Object& obj, const char* image) {
+	setObjectImage(obj.id, image);
+}
+
+// createObject 오버로딩
+Object createObject(const char* name, const char* image, int x, int y, float scale = 1.0f, bool empty = false) {
+	Object obj = { createObject(name, image), x, y, empty };
+	scaleObject(obj, scale);
+	return obj;
+}
+
+// ==============================================================================================================
+// 그 외 함수
+
+// 퍼즐 조각인 사과 세팅
+void puzzleSetting(void) {
+	// 반복문을 통해 퍼즐 조각을 세팅함
+	for (int i = 0; i < 9; i++) {
+		char name[20];
+		sprintf_s(name, sizeof(name), "사과%d", i + 1);
+
+		char image[60];
+		sprintf_s(image, sizeof(image), ".\\ProjectImages\\partition\\apple_00%d.png", i + 1);
+
+		apples[i] = createObject(name, image, 0, 0);
+	}
+}
+
+// 퍼즐 시작
+void puzzleStart(void) {
+	// 퍼즐 조각들이 담겨있는 apples 배열에서 9개를 랜덤으로 배치한다.
+	int random_list[9] = { 3, 4, 5, 6, 7, 8, 0, 1, 2 };
+	int index = 0;
+
+	// 공백이 될 조각의 인덱스를 랜덤으로 설정한다.
+	int empty_index = 3;
+
+	for (int y = 0; y < 3; y++) {
+		for (int x = 0; x < 3; x++) {
+			puzzle[y][x] = apples[random_list[index]];
+			locateObject(puzzle[y][x], mainScene, appleX[index % 3], appleY[index / 3]);
+			showObject(puzzle[y][x]);
+
+			if (index == empty_index) {
+				puzzle[y][x].isEmpty = true;
+				setObjectImage(puzzle[y][x], "none-is-white-image");
+			}
+
+			index += 1;
+		}
+	}
+
+
+}
+
+// 퍼즐 조각의 위치 변경
+void swap(Object& a, Object& b) {
+	Object temp = a;
+	a = b;
+	b = temp;
+}
+
+// 퍼즐 조각이 공백과 맞닿아 있는지 확인하고, 공백이 있다면 해당 오브젝트를 전달
+// 공백이 없다면 존재할 수 없는 오브젝트를 전달
+Object isTouching(int x, int y) {
+	if (y - 1 >= 0) {
+		if (puzzle[y - 1][x].isEmpty) {
+			return puzzle[y - 1][x];
+		}
+	}
+	if (y + 1 <= 2) {
+		if (puzzle[y + 1][x].isEmpty) {
+			return puzzle[y + 1][x];
+		}
+	}
+	if (x - 1 >= 0) {
+		if (puzzle[y][x - 1].isEmpty) {
+			return puzzle[y][x - 1];
+		}
+	}
+	if (x + 1 <= 2) {
+		if (puzzle[y][x + 1].isEmpty) {
+			return puzzle[y][x + 1];
+		}
+	}
+
+	return puzzle[y][x];
+}
+
+// 마우스 입력 처리
+void mouseCallback(ObjectID obj_id, const int x, const int y, MouseAction action) {
+
+	// 버튼이 마우스 입력을 받았을 경우
+	if (obj_id == startButton.id) {
+		if (action == MOUSE_CLICK) {
+			hideObject(startButton);
+			hideObject(APPLE);
+
+			puzzleSetting();
+			puzzleStart();
+
+			enterScene(mainScene);
+		}
+	}
+	else if (obj_id == restartButton.id) {
+		if (action == MOUSE_CLICK) {
+			puzzleStart();
+		}
+	}
+
+	// 퍼즐 조각이 마우스 입력을 받았을 경우
+	else if (obj_id == puzzle[0][0].id) {
+		Object empty = isTouching(0, 0);
+		if (empty.id != puzzle[0][0].id) {
+			swap(puzzle[0][0], empty);
+		}
+	}
+
+}
+
+// ==============================================================================================================
+
+int main(void) {
+	// 1. 시작 버튼을 누르면 퍼즐이 랜덤하게 배치된다.
+	// 2. 랜덤하게 배치된 퍼즐 중 하나가 하얀 이미지(이하 공백)로 변경된다. (이미지 파일 미부여)
+	// 3. 공백과 상하좌우로 닿아 있는 퍼즐을 클릭할 경우 공백과 해당 퍼즐이 자리가 변경된다.
+	// 4. 퍼즐이 완벽하게 맞은 경우 클리어된다.
+
+	// 마우스 처리 함수 등록
+	setMouseCallback(mouseCallback);
+
+	// 장면
+	startScene = createScene("준비", "none-is-white-background");
+	mainScene = createScene("사과 퍼즐", "none-is-white-background");
+
+	// 버튼
+	startButton = createObject("시작", ".\\ProjectImages\\start.png", 600, 25, 0.5f);
+	locateObject(startButton, startScene);
+	showObject(startButton);
+
+	restartButton = createObject("재시작", ".\\ProjectImages\\restart.png", 600, 25, 0.5f);
+	locateObject(restartButton, mainScene);
+	showObject(restartButton);
+
+	// 시작 화면의 사과 1개
+	APPLE = createObject("사과", ".\\ProjectImages\\apple.png", 400, 150);
+	locateObject(APPLE, startScene);
+	showObject(APPLE);
+
+
+	// 게임 시작
+	startGame(startScene);
+}
